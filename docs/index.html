@@ -3,45 +3,73 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Uzonova — Accelerate B2B Revenue Through Presales Excellence and AI-Era Enablement</title>
-  <meta name="description" content="Accelerate B2B Revenue Through Presales Excellence and AI-Era Enablement">
-  <meta property="og:title" content="Uzonova — Accelerate B2B Revenue Through Presales Excellence and AI-Era Enablement">
-  <meta property="og:description" content="Accelerate B2B Revenue Through Presales Excellence and AI-Era Enablement">
+  <title>Uzonova — Presales &amp; Revenue Enablement for B2B Tech</title>
+  <meta name="description" content="Uzonova helps B2B SaaS, AI, and technology companies build world-class presales and revenue-enablement capabilities — win more deals, faster.">
+  <meta property="og:title" content="Uzonova — Presales &amp; Revenue Enablement for B2B Tech">
+  <meta property="og:description" content="Build world-class presales and revenue-enablement capabilities. Turn complex technology into clear business outcomes.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://agentgrow-io.github.io/uzonova/">
   <link rel="canonical" href="https://agentgrow-io.github.io/uzonova/">
   <link rel="stylesheet" href="css/blog.css">
 </head>
 <body>
-  <header class="site-header"><div class="inner">
-    <a href="./" class="logo">Uzonova</a>
-    <nav><a href="./">Blog</a><a href="about.html">About</a><a href="services.html">Services</a></nav>
-  </div></header>
-  <section class="hero"><div class="container-narrow">
-    <p class="tag">Uzonova</p><h1>Turn Complex Tech Into Clear Business Outcomes</h1><p class="subtitle">We help SaaS and technology companies build world-class presales and sales capabilities to accelerate deal velocity and increase win rates.</p>
-    <p><a class="btn-lime" href="services.html">Our Services</a> <a class="btn-outline" href="about.html">About Uzonova</a></p>
-  </div></section>
-  <section class="container-narrow article-body"><h2>What we do</h2>
-<h3>Presales & Solution Selling Excellence</h3><p>Align technical credibility with commercial outcomes to reduce sales-to-presales handoff friction and accelerate deal velocity.</p>
-<h3>Deal Strategy & Win-Rate Optimization</h3><p>Pressure-test opportunities, sharpen qualification criteria, and structure executive-level negotiations to secure more wins.</p>
-<h3>Revenue Enablement & Sales Coaching</h3><p>Upskill presales and sales teams, standardize playbooks, and measure enablement ROI to drive consistent performance.</p>
+  <div id="site-header"></div>
+
+  <section class="hero">
+    <div class="container-narrow">
+      <span class="tag">Presales &amp; Revenue Enablement</span>
+      <h1>Turn Complex Tech Into <span class="grad-text">Clear Business Outcomes</span></h1>
+      <p class="subtitle">Uzonova helps B2B SaaS, AI, and technology companies build world-class presales and revenue-enablement capabilities — so your teams win more deals, faster.</p>
+      <div class="hero-cta">
+        <a class="btn-lime" href="services.html">Explore our services</a>
+        <a class="btn-outline" href="about.html">About Uzonova</a>
+      </div>
+    </div>
   </section>
-  <section class="container" style="padding-top:0">
-    <h2 class="container-narrow" style="margin-bottom:1rem">From the blog</h2>
-    <div class="filters" id="filters"></div><div class="card-grid" id="posts-grid"></div>
-    <div id="empty-state" style="display:none;text-align:center;padding:3rem 1rem;color:var(--zinc-500)"><p style="font-size:1.125rem">First post coming soon.</p></div>
+
+  <section class="container">
+    <div class="section-head reveal">
+      <p class="eyebrow">What we do</p>
+      <h2>Presales that drives revenue, not just supports it</h2>
+      <p>Three disciplines that compound into a predictable, high-velocity go-to-market motion.</p>
+    </div>
+    <div class="feature-grid">
+      <div class="feature reveal"><div class="ic">🤝</div><h3>Presales &amp; Solution Selling Excellence</h3><p>Align technical credibility with commercial outcomes, cut sales-to-presales handoff friction, and accelerate deal velocity.</p></div>
+      <div class="feature reveal"><div class="ic">🎯</div><h3>Deal Strategy &amp; Win-Rate Optimization</h3><p>Pressure-test opportunities, sharpen qualification, and structure executive-level negotiations to close more of what matters.</p></div>
+      <div class="feature reveal"><div class="ic">📈</div><h3>Revenue Enablement &amp; Sales Coaching</h3><p>Upskill presales and sales teams, standardize playbooks, and measure enablement ROI for consistent, repeatable performance.</p></div>
+    </div>
   </section>
-  <footer class="site-footer"><div class="inner"><div class="brand">
-    <a href="./" class="logo" style="color:var(--white);text-decoration:none;font-weight:700;font-size:1.125rem">Uzonova</a>
-    <p>Accelerate B2B Revenue Through Presales Excellence and AI-Era Enablement</p><p class="copy">&copy; <span id="year"></span> Uzonova. All rights reserved.</p>
-  </div></div></footer>
-  <script>
-    const BADGE_CLASS={'Platform':'badge-platform','Getting Started':'badge-getting-started','How-To':'badge-how-to','Strategy':'badge-strategy'};
-    let posts=[],activeFilter='All';document.getElementById('year').textContent=new Date().getFullYear();
-    function categories(){const s=new Set(posts.map(p=>p.category).filter(Boolean));return ['All',...Array.from(s).sort()];}
-    function escapeHtml(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
-    function renderFilters(){const el=document.getElementById('filters');const c=categories();if(c.length<=1){el.innerHTML='';return;}el.innerHTML=c.map(x=>'<button class="filter-btn'+(x===activeFilter?' active':'')+'" data-cat="'+x+'">'+x+'</button>').join('');el.querySelectorAll('.filter-btn').forEach(b=>b.addEventListener('click',()=>{activeFilter=b.dataset.cat;renderFilters();renderPosts();}));}
-    function renderPosts(){const grid=document.getElementById('posts-grid'),em=document.getElementById('empty-state');if(!posts.length){grid.innerHTML='';em.style.display='block';return;}em.style.display='none';const f=activeFilter==='All'?posts:posts.filter(p=>p.category===activeFilter);grid.innerHTML=f.map(p=>'<div class="card"><span class="badge '+(BADGE_CLASS[p.category]||'')+'">'+escapeHtml(p.category)+'</span><h2><a href="posts/'+encodeURIComponent(p.slug)+'.html">'+escapeHtml(p.title)+'</a></h2><p class="excerpt">'+escapeHtml(p.excerpt)+'</p><div class="card-meta"><span>'+escapeHtml(p.publishedAt)+'</span><span>&middot;</span><span>'+escapeHtml(p.readTime)+'</span></div></div>').join('');}
-    fetch('posts-data.json').then(r=>r.json()).then(d=>{posts=(d||[]).sort((a,b)=>new Date(b.publishedAt)-new Date(a.publishedAt));renderFilters();renderPosts();}).catch(()=>{posts=[];renderPosts();});
-  </script>
-</body></html>
+
+  <section class="blog-section">
+    <div class="blog-featured">
+      <div class="scroller-head reveal">
+        <h2>From the blog</h2>
+        <div class="scroller-ctrls">
+          <button data-scroll="prev" aria-label="Scroll left">&#8249;</button>
+          <button data-scroll="next" aria-label="Scroll right">&#8250;</button>
+        </div>
+      </div>
+      <div class="scroller" id="featured-scroller"></div>
+    </div>
+    <div class="container">
+      <div class="filters" id="filters"></div>
+      <div class="card-grid" id="posts-grid"></div>
+      <div class="empty-state" id="empty-state" style="display:none">
+        <p style="font-size:1.125rem;font-weight:600;color:var(--ink)">First post coming soon.</p>
+        <p>Insights on presales, solution selling, and revenue enablement are on the way.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="container">
+    <div class="cta-band reveal">
+      <h2>Build a presales engine that compounds</h2>
+      <p>See how Uzonova turns complex technology into clear, measurable revenue outcomes.</p>
+      <a class="btn-lime" href="https://uzonova.com/" target="_blank" rel="noopener">Talk to Uzonova</a>
+    </div>
+  </section>
+
+  <div id="site-footer"></div>
+  <script src="js/site.js" defer></script>
+</body>
+</html>
