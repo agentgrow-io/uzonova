@@ -1,0 +1,353 @@
+#!/usr/bin/env python3
+"""Regenerate docs/posts-data.json and docs/sitemap.xml from docs/posts/*.html.
+
+The HTML files are the source of truth; every index artefact is derived. Run
+this after creating/editing/deleting any post. docs/scripts/publish.sh does
+this automatically; .github/workflows/validate-indexes.yml enforces it in CI.
+
+Safe to run repeatedly — output is deterministic for a given input tree.
+
+The canonical/sitemap base URL is read from the BLOG_BASE environment variable
+(set by publish.sh to the repo's GitHub Pages origin,
+e.g. https://agentgrow-io.github.io/<slug>). When unset it falls back to the
+account origin so this runs standalone (e.g. CI drift check on an empty repo).
+"""
+import json
+import os
+import re
+import sys
+from datetime import datetime
+from pathlib import Path
+
+# docs/scripts/regenerate_indexes.py -> docs/
+DOCS = Path(__file__).resolve().parent.parent
+POSTS_DIR = DOCS / "posts"
+JSON_PATH = DOCS / "posts-data.json"
+SITEMAP_PATH = DOCS / "sitemap.xml"
+
+# Per-repo canonical origin. publish.sh exports BLOG_BASE; the fallback keeps
+# this script runnable standalone (drift check) without any branding baked in.
+BASE = (os.environ.get("BLOG_BASE") or "https://agentgrow-io.github.io").rstrip("/")
+
+# SEO/AEO lint thresholds. See the --strict flag below.
+TITLE_MAX = 65
+DESC_MAX = 170
+DESC_MIN = 120
+
+
+def extract_meta(html, attr, value):
+    pat1 = rf'<meta\s+{attr}="{re.escape(value)}"\s+content="([^"]*)"'
+    pat2 = rf'<meta\s+content="([^"]*)"\s+{attr}="{re.escape(value)}"'
+    m = re.search(pat1, html) or re.search(pat2, html)
+    return m.group(1) if m else None
+
+
+def html_unescape(s):
+    if s is None:
+        return s
+    return (
+        s.replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", '"')
+        .replace("&#39;", "'")
+        .replace("&#x27;", "'")
+    )
+
+
+def extract_date(html):
+    """Try every known date location. Returns ISO YYYY-MM-DD or None."""
+    # JSON-LD datePublished
+    m = re.search(r'"datePublished"\s*:\s*"([^"]+)"', html)
+    if m:
+        return m.group(1)[:10]
+    # article:published_time meta
+    iso = extract_meta(html, "property", "article:published_time")
+    if iso:
+        return iso[:10]
+    return None
+
+
+def extract_category(html, existing=None):
+    """Extract category. Priority order:
+    1. existing JSON entry (preserve hand-curated taxonomy)
+    2. badge CSS class
+    3. article:section meta tag
+    4. "Strategy" fallback
+    """
+    if existing:
+        if existing.get("category"):
+            return existing["category"]
+        cats = existing.get("categories")
+        if cats and isinstance(cats, list):
+            return cats[0].replace("-", " ").title()
+
+    m = re.search(r'class="badge\s+badge-([a-z0-9-]+)"', html)
+    if m:
+        slug = m.group(1)
+        if slug == "how-to":
+            return "How-To"
+        return " ".join(w.capitalize() for w in slug.split("-"))
+
+    section = extract_meta(html, "property", "article:section")
+    if section:
+        return html_unescape(section).strip()
+
+    return "Strategy"
+
+
+def extract_read_time(html, existing=None):
+    if existing and existing.get("readTime"):
+        return existing["readTime"]
+    # Try rendered markup like "7 min read"
+    m = re.search(r"(\d+)\s*min\s*read", html, re.IGNORECASE)
+    if m:
+        return f"{m.group(1)} min read"
+    # Estimate from word count
+    text = re.sub(r"<script[\s\S]*?</script>", " ", html)
+    text = re.sub(r"<style[\s\S]*?</style>", " ", text)
+    text = re.sub(r"<[^>]+>", " ", text)
+    words = len(re.findall(r"\w+", text))
+    return f"{max(3, round(words / 220))} min read"
+
+
+def extract_tags(html, existing=None):
+    if existing and existing.get("tags"):
+        return existing["tags"]
+    # Try meta keywords
+    kw = extract_meta(html, "name", "keywords")
+    if kw:
+        return [k.strip() for k in kw.split(",") if k.strip()]
+    return []
+
+
+def format_published(iso_date):
+    """Convert 2026-04-01 -> 'Apr 1, 2026' (matches existing schema)."""
+    try:
+        dt = datetime.strptime(iso_date, "%Y-%m-%d")
+        return dt.strftime("%b %-d, %Y")
+    except ValueError:
+        return iso_date
+
+
+def load_existing_by_slug():
+    if not JSON_PATH.exists():
+        return {}
+    with open(JSON_PATH) as f:
+        data = json.load(f)
+    result = {}
+    for p in data:
+        slug = p.get("slug")
+        if slug:
+            result[slug] = p
+    return result
+
+
+def build_entry(slug, html, existing=None):
+    """Build one posts-data.json entry from post HTML."""
+    existing = existing or {}
+
+    og_title = extract_meta(html, "property", "og:title")
+    if not og_title:
+        # JSON-LD headline
+        m = re.search(r'"headline"\s*:\s*"([^"]+)"', html)
+        og_title = m.group(1) if m else existing.get("title", slug)
+    title = html_unescape(og_title).strip()
+
+    desc = extract_meta(html, "name", "description") or extract_meta(
+        html, "property", "og:description"
+    )
+    if not desc:
+        m = re.search(r'"description"\s*:\s*"([^"]+)"', html)
+        desc = m.group(1) if m else existing.get("excerpt") or existing.get("description", "")
+    desc = html_unescape(desc) if desc else ""
+
+    iso_date = extract_date(html) or existing.get("date") or "2026-01-01"
+
+    og_image = extract_meta(html, "property", "og:image")
+    if og_image:
+        # Normalize to blog-relative path: strip the BASE prefix if present.
+        image = og_image.replace(f"{BASE}/", "")
+    else:
+        image = existing.get("image") or f"images/{slug}.jpg"
+
+    category = extract_category(html, existing)
+    read_time = extract_read_time(html, existing)
+    tags = extract_tags(html, existing)
+
+    return {
+        "title": title,
+        "slug": slug,
+        "category": category,
+        "excerpt": desc,
+        "description": desc,
+        "publishedAt": format_published(iso_date),
+        "date": iso_date,
+        "readTime": read_time,
+        "image": image,
+        "tags": tags,
+        "url": f"posts/{slug}.html",
+    }
+
+
+def is_redirect_stub(html):
+    return bool(re.search(r'<meta\s+http-equiv="refresh"', html[:500], re.IGNORECASE))
+
+
+def regenerate_posts_json():
+    existing_by_slug = load_existing_by_slug()
+    entries = []
+    for post_file in sorted(POSTS_DIR.glob("*.html")):
+        slug = post_file.stem
+        html = post_file.read_text(encoding="utf-8")
+        if is_redirect_stub(html):
+            continue
+        entries.append(build_entry(slug, html, existing_by_slug.get(slug)))
+    # Sort newest-first by ISO date (the frontend re-sorts by publishedAt but
+    # sorted JSON is easier to diff and review)
+    entries.sort(key=lambda e: e["date"], reverse=True)
+    JSON_PATH.write_text(
+        json.dumps(entries, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    return entries
+
+
+def regenerate_sitemap(entries):
+    # Fixed fallback (not today's date) so an empty blog's sitemap is
+    # deterministic — otherwise the home <lastmod> would drift daily and the
+    # CI drift check would fail on every repo that hasn't published yet.
+    newest = entries[0]["date"] if entries else "2026-01-01"
+    lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+        "  <url>",
+        f"    <loc>{BASE}/</loc>",
+        f"    <lastmod>{newest}</lastmod>",
+        "    <changefreq>weekly</changefreq>",
+        "    <priority>1.0</priority>",
+        "  </url>",
+    ]
+    for e in entries:
+        lines.append("  <url>")
+        lines.append(f"    <loc>{BASE}/posts/{e['slug']}.html</loc>")
+        lines.append(f"    <lastmod>{e['date']}</lastmod>")
+        lines.append("    <changefreq>monthly</changefreq>")
+        lines.append("    <priority>0.7</priority>")
+        lines.append("  </url>")
+    lines.append("</urlset>")
+    lines.append("")
+    SITEMAP_PATH.write_text("\n".join(lines), encoding="utf-8")
+
+
+def lint_post(slug, html):
+    """Return list of (severity, message) for SEO/AEO issues.
+
+    severity: "warn" by default. main() escalates to error with --strict.
+    """
+    issues = []
+
+    t_match = re.search(r"<title>([^<]+)</title>", html)
+    if t_match:
+        title_text = html_unescape(t_match.group(1)).strip()
+        if len(title_text) > TITLE_MAX:
+            issues.append(
+                ("warn", f"<title> is {len(title_text)} chars (max {TITLE_MAX}); SERP will truncate")
+            )
+    else:
+        issues.append(("warn", "no <title> tag"))
+
+    desc = extract_meta(html, "name", "description")
+    if desc is None:
+        issues.append(("warn", 'meta name="description" missing'))
+    else:
+        desc_text = html_unescape(desc)
+        if len(desc_text) > DESC_MAX:
+            issues.append(
+                ("warn", f'meta description is {len(desc_text)} chars (max {DESC_MAX}); SERP will truncate')
+            )
+        elif len(desc_text) < DESC_MIN:
+            issues.append(
+                ("warn", f'meta description is {len(desc_text)} chars (min {DESC_MIN}); under-using the snippet')
+            )
+
+    if not re.search(r'"@type"\s*:\s*"BlogPosting"', html):
+        issues.append(("warn", 'missing JSON-LD {"@type":"BlogPosting"}'))
+
+    if not re.search(r'"@type"\s*:\s*"FAQPage"', html):
+        issues.append(("warn", 'missing FAQPage schema (AEO / AI Overview eligibility)'))
+
+    if not re.search(r'internal-links|Related reading|\xf0\x9f\x93\x9a Related', html) \
+       and "📚 Related reading" not in html:
+        issues.append(("warn", "no internal-links / Related reading block (hurts discovery + PageRank flow)"))
+
+    return issues
+
+
+def main():
+    strict = "--strict" in sys.argv
+    entries = regenerate_posts_json()
+    regenerate_sitemap(entries)
+
+    required = ("slug", "title", "category", "excerpt", "publishedAt", "readTime", "date")
+    missing = [
+        (e["slug"], [k for k in required if not e.get(k)])
+        for e in entries
+        if not all(e.get(k) for k in required)
+    ]
+    if missing:
+        print("ERROR: entries missing required fields:", file=sys.stderr)
+        for slug, miss in missing:
+            print(f"  {slug}: {miss}", file=sys.stderr)
+        sys.exit(2)
+
+    # Catch future-dated datePublished typos. Hard fail so publish.sh / CI
+    # drift check stops the push.
+    today = datetime.now().strftime("%Y-%m-%d")
+    future = [(e["slug"], e["date"]) for e in entries if e["date"] > today]
+    if future:
+        print(f"ERROR: {len(future)} post(s) have date in the future (today={today}):", file=sys.stderr)
+        for slug, date in future:
+            print(f"  {date}  {slug}", file=sys.stderr)
+        print("Fix the article:published_time / JSON-LD datePublished in the post HTML.", file=sys.stderr)
+        sys.exit(2)
+
+    if entries:
+        print(f"posts-data.json: {len(entries)} entries (newest {entries[0]['date']})")
+    else:
+        print("posts-data.json: 0 entries (empty blog — first post coming soon)")
+    print(f"sitemap.xml    : {len(entries)} post URL(s) + home")
+
+    # ---------------- SEO/AEO lint pass ----------------
+    lint_totals = {"post_issues": 0, "issues": 0}
+    per_check = {}
+    for post_file in sorted(POSTS_DIR.glob("*.html")):
+        slug = post_file.stem
+        html = post_file.read_text(encoding="utf-8")
+        if is_redirect_stub(html):
+            continue
+        issues = lint_post(slug, html)
+        if issues:
+            lint_totals["post_issues"] += 1
+            lint_totals["issues"] += len(issues)
+            for sev, msg in issues:
+                key = re.sub(r"\d+", "N", msg.split(";")[0])
+                per_check[key] = per_check.get(key, 0) + 1
+                prefix = "::warning file=docs/posts/{slug}.html::".format(slug=slug) if os.environ.get("GITHUB_ACTIONS") else f"  warn  {slug}: "
+                print(f"{prefix}{msg}", file=sys.stderr)
+
+    if lint_totals["issues"]:
+        print(
+            f"\nSEO/AEO lint: {lint_totals['issues']} issue(s) across {lint_totals['post_issues']} post(s)",
+            file=sys.stderr,
+        )
+        for k, v in sorted(per_check.items(), key=lambda x: -x[1]):
+            print(f"  {v:3d}  {k}", file=sys.stderr)
+        if strict:
+            print("--strict set; failing.", file=sys.stderr)
+            sys.exit(3)
+    else:
+        print("SEO/AEO lint: clean ✓")
+
+
+if __name__ == "__main__":
+    main()

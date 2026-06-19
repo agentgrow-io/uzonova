@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blog — Uzonova</title>
+  <meta name="description" content="Presales, solution selling & revenue enablement for SaaS and technology companies.">
+  <meta property="og:title" content="Blog — Uzonova">
+  <meta property="og:description" content="Presales, solution selling & revenue enablement for SaaS and technology companies.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://agentgrow-io.github.io/uzonova/">
+  <meta name="twitter:card" content="summary">
+  <link rel="canonical" href="https://agentgrow-io.github.io/uzonova/">
+  <link rel="stylesheet" href="css/blog.css">
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="site-header">
+    <div class="inner">
+      <a href="./" class="logo">Uzonova</a>
+      <nav>
+        <a href="./">Blog</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="container-narrow">
+      <p class="tag">Blog</p>
+      <h1>Uzonova Blog</h1>
+      <p class="subtitle">Presales, solution selling & revenue enablement for SaaS and technology companies.</p>
+    </div>
+  </section>
+
+  <!-- Filters + Cards -->
+  <section class="container" style="padding-top:0">
+    <div class="filters" id="filters"></div>
+    <div class="card-grid" id="posts-grid"></div>
+    <div id="empty-state" style="display:none;text-align:center;padding:3rem 1rem;color:var(--zinc-500)">
+      <p style="font-size:1.125rem">First post coming soon.</p>
+      <p>Uzonova is getting its blog ready. Check back shortly.</p>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="inner">
+      <div class="brand">
+        <a href="./" class="logo" style="color:var(--white);text-decoration:none;font-weight:700;font-size:1.125rem">Uzonova</a>
+        <p>Presales, solution selling & revenue enablement for SaaS and technology companies.</p>
+        <p class="copy">&copy; <span id="year"></span> Uzonova. All rights reserved.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    const BADGE_CLASS = {
+      'Platform': 'badge-platform',
+      'Getting Started': 'badge-getting-started',
+      'How-To': 'badge-how-to',
+      'Strategy': 'badge-strategy',
+    };
+
+    let posts = [];
+    let activeFilter = 'All';
+
+    document.getElementById('year').textContent = new Date().getFullYear();
+
+    function categories() {
+      const set = new Set(posts.map(p => p.category).filter(Boolean));
+      return ['All', ...Array.from(set).sort()];
+    }
+
+    function renderFilters() {
+      const el = document.getElementById('filters');
+      const cats = categories();
+      if (cats.length <= 1) { el.innerHTML = ''; return; }
+      el.innerHTML = cats.map(c =>
+        '<button class="filter-btn' + (c === activeFilter ? ' active' : '') + '" data-cat="' + c + '">' + c + '</button>'
+      ).join('');
+      el.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          activeFilter = btn.dataset.cat;
+          renderFilters();
+          renderPosts();
+        });
+      });
+    }
+
+    function escapeHtml(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    function renderPosts() {
+      const grid = document.getElementById('posts-grid');
+      const empty = document.getElementById('empty-state');
+      if (!posts.length) {
+        grid.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+      const filtered = activeFilter === 'All' ? posts : posts.filter(p => p.category === activeFilter);
+      grid.innerHTML = filtered.map(p =>
+        '<div class="card">' +
+          '<span class="badge ' + (BADGE_CLASS[p.category] || '') + '">' + escapeHtml(p.category) + '</span>' +
+          '<h2><a href="posts/' + encodeURIComponent(p.slug) + '.html">' + escapeHtml(p.title) + '</a></h2>' +
+          '<p class="excerpt">' + escapeHtml(p.excerpt) + '</p>' +
+          '<div class="card-meta"><span>' + escapeHtml(p.publishedAt) + '</span><span>&middot;</span><span>' + escapeHtml(p.readTime) + '</span></div>' +
+        '</div>'
+      ).join('');
+    }
+
+    fetch('posts-data.json')
+      .then(r => r.json())
+      .then(data => {
+        posts = (data || []).sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
+        renderFilters();
+        renderPosts();
+      })
+      .catch(() => {
+        posts = [];
+        renderPosts();
+      });
+  </script>
+
+</body>
+</html>
