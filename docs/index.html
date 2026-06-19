@@ -41,20 +41,13 @@
   </section>
 
   <section class="blog-section">
-    <div class="blog-featured">
-      <div class="scroller-head reveal">
-        <h2>From the blog</h2>
-        <div class="scroller-ctrls">
-          <button data-scroll="prev" aria-label="Scroll left">&#8249;</button>
-          <button data-scroll="next" aria-label="Scroll right">&#8250;</button>
-        </div>
-      </div>
-      <div class="scroller" id="featured-scroller"></div>
-    </div>
     <div class="container">
-      <div class="filters" id="filters"></div>
-      <div class="card-grid" id="posts-grid"></div>
-      <div class="empty-state" id="empty-state" style="display:none">
+      <div class="scroller-head reveal" style="margin-bottom:1.5rem">
+        <h2>Latest from the blog</h2>
+        <a href="blog.html" style="display:inline-flex;align-items:center;gap:.4rem;color:var(--azure);font-weight:600;border:1px solid var(--gray-200);background:#fff;padding:.6rem 1.2rem;border-radius:var(--radius-pill)">View all posts &rarr;</a>
+      </div>
+      <div class="card-grid" id="latest-posts"></div>
+      <div class="empty-state" id="latest-empty" style="display:none">
         <p style="font-size:1.125rem;font-weight:600;color:var(--ink)">First post coming soon.</p>
         <p>Insights on presales, solution selling, and revenue enablement are on the way.</p>
       </div>
